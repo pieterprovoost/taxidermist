@@ -1,0 +1,14 @@
+Package: taxidermist
+Title: Taxonomy tools
+Version: 0.1.0
+Authors@R: 
+    person("Pieter", "Provoost", email = "pieterprovoost@gmail.com", role = c("aut", "cre"))
+Description: Taxonomy tools.
+License: `use_mit_license()`
+Encoding: UTF-8
+Roxygen: list(markdown = TRUE)
+RoxygenNote: 7.3.2
+Imports:
+    dplyr,
+    stringr,
+    purrr
