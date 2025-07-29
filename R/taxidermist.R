@@ -60,6 +60,12 @@ parse_taxonomy_string <- function(input) {
     ungroup()
 }
 
+#' Add taxonomy to a data frame by parsing a taxonomy string column
+#' 
+#' @param df A data frame.
+#' @param col The column containing taxonomy strings formatted as 'tax=' followed by a comma-separated list of key:value pairs (e.g., d:Eukaryota,p:NA,...).
+#' @return A data frame.
+#' @export
 parse_taxonomy <- function(df, col) {
   col <- rlang::enquo(col)
   tax_df <- parse_taxonomy_string(pull(df, !!col))
