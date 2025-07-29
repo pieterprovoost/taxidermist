@@ -11,4 +11,7 @@ RoxygenNote: 7.3.2
 Imports:
     dplyr,
     stringr,
-    purrr
+    purrr,
+    gnparser
+Remotes:
+    pieterprovoost/gnparser

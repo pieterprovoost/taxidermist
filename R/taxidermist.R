@@ -7,10 +7,13 @@
 #' @import dplyr stringr purrr
 NULL
 
+ranks_map <- c("superkingdom" = "sk", "domain" = "d", "phylum" = "p", "class" = "c", "order" = "o", "family" = "f", "genus" = "g", "species" = "s")
+
 #' Replace string 'NA' with actual NA in all character columns
 #' 
 #' @param df A data frame.
 #' @return A data frame with 'NA' strings in character columns replaced by NA values.
+#' @export
 replace_na_strings <- function(df) {
   df %>%
     dplyr::mutate(
@@ -21,14 +24,31 @@ replace_na_strings <- function(df) {
     )
 }
 
+#' Update scientificName and taxonRank based on rank columns
+#' 
+#' @param df A data frame.
+#' @return A data frame.
+#' @export
+update_scientificname_rank <- function(df) {
+  df %>%
+    mutate(scientificName = do.call(coalesce, across(all_of(rev(names(ranks_map)))))) %>%
+    rowwise() %>%
+    mutate(
+      taxonRank = {
+        vals <- c_across(all_of(names(ranks_map)))
+        non_na <- which(!is.na(vals))
+        if (length(non_na)) names(ranks_map)[max(non_na)] else NA_character_
+      }
+    ) %>%
+    ungroup()
+}
+
 #' Parse taxonomy strings into a data frame
 #'
 #' @param input Character vector. Each element must contain 'tax=' followed by a comma-separated list of key:value pairs (e.g., d:Eukaryota,p:NA,...).
 #' @return A data frame with columns for each taxonomic rank and one row per input string.
 #' @export
 parse_taxonomy_string <- function(input) {
-  ranks_map = c("superkingdom" = "sk", "domain" = "d", "phylum" = "p", "class" = "c", "order" = "o", "family" = "f", "genus" = "g", "species" = "s")
-
   valid_pattern <- "^.*tax=([a-z]+:[^,]+)(,[a-z]+:[^,]+)*$"
   if (any(!grepl(valid_pattern, input))) {
     stop("Each input string must contain 'tax=' followed by a comma-separated list of key:value pairs (e.g., d:Eukaryota,p:NA,...)")
@@ -48,16 +68,7 @@ parse_taxonomy_string <- function(input) {
     bind_rows() %>% 
     rename(any_of(ranks_map)) %>%
     replace_na_strings() %>%
-    mutate(scientificName = do.call(coalesce, across(all_of(rev(names(ranks_map)))))) %>%
-    rowwise() %>%
-    mutate(
-      taxonRank = {
-        vals <- c_across(all_of(names(ranks_map)))
-        non_na <- which(!is.na(vals))
-        if (length(non_na)) names(ranks_map)[max(non_na)] else NA_character_
-      }
-    ) %>%
-    ungroup()
+    update_scientificname_rank()
 }
 
 #' Add taxonomy to a data frame by parsing a taxonomy string column
@@ -70,4 +81,45 @@ parse_taxonomy <- function(df, col) {
   col <- rlang::enquo(col)
   tax_df <- parse_taxonomy_string(pull(df, !!col))
   dplyr::bind_cols(df, tax_df)
+}
+
+#' Get distinct names from all rank columns.
+#' 
+#' @param df A data frame.
+#' @return A data frame.
+#' @export
+get_distinct_names <- function(df) {
+  df %>%
+    select(all_of(names(ranks_map))) %>%
+    pivot_longer(everything(), values_to = "taxon") %>%
+    filter(!is.na(taxon)) %>%
+    distinct(taxon) %>%
+    pull(taxon)
+}
+
+#' Parse names using gnparser.
+#' 
+#' @param input A vector of names.
+#' @return A data frame.
+gn_parse_names <- function(input) {
+  parsed <- gnparser::parse(input)
+  parsed$input <- input
+  parsed
+}
+
+#' Parse names in taxonomy columns using gnparser, remove unparsable names, and update scientificName and taxonRank.
+#' 
+#' @param df A data frame.
+#' @return A data frame.
+#' @export
+remove_unparsable_names <- function(df) {
+  unparsable_names <- df %>% 
+    get_distinct_names() %>% 
+    gn_parse_names() %>% 
+    filter(parsed == FALSE | quality > 2) %>% 
+    pull(input)
+
+  df %>%
+    mutate(across(all_of(names(ranks_map)), ~ ifelse(. %in% unparsable_names, NA, .))) %>% 
+    update_scientificname_rank()
 }

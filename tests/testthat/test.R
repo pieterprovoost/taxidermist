@@ -39,3 +39,19 @@ test_that("parse_taxonomy adds taxonomy columns correctly", {
   df <- input %>% 
     parse_taxonomy(taxonomy)
 })
+
+test_that("remove_unparsable_names functions as expected", {
+  input <- data.frame(taxonomy = c(
+    ">AF290071;tax=d:Eukaryota,p:NA,c:NA,o:NA,f:NA,g:NA,s:Uncultured_marine_alveolate_Group_II_DH147-EKD16",
+    ">PV277008;tax=d:Eukaryota,p:Annelida,c:Polychaeta,o:NA,f:Capitellidae,g:Notodasus,s:NA",
+    ">XR_012195772;tax=d:NA,p:NA,c:NA,o:NA,f:NA,g:NA,s:NA"
+  ))
+  df <- parse_taxonomy(input, taxonomy) %>%
+    remove_unparsable_names()
+  expect_equal(df$scientificName[1], "Eukaryota")
+  expect_equal(df$taxonRank[1], "domain")
+  expect_equal(df$scientificName[2], "Notodasus")
+  expect_equal(df$taxonRank[2], "genus")
+  expect_true(is.na(df$scientificName[3]))
+  expect_true(is.na(df$taxonRank[3]))
+})
