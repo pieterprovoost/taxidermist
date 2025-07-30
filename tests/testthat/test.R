@@ -34,10 +34,17 @@ test_that("parse_taxonomy_string errors on invalid input", {
 test_that("parse_taxonomy adds taxonomy columns correctly", {
   input <- data.frame(taxonomy = c(
     ">AF290071;tax=d:Eukaryota,p:NA,c:NA,o:NA,f:NA,g:NA,s:Uncultured_marine_alveolate_Group_II_DH147-EKD16",
-    ">GQ892044;tax=sk:Eukaryota,p:Endomyxa,c:Phytomyxea,o:Plasmodiophorida,f:Plasmodiophoridae,g:Polymyxa,s:Polymyxa_graminis"
+    ">PV277008;tax=d:Eukaryota,p:Annelida,c:Polychaeta,o:NA,f:Capitellidae,g:Notodasus,s:NA",
+    ">XR_012195772;tax=d:NA,p:NA,c:NA,o:NA,f:NA,g:NA,s:NA"
   ))
   df <- input %>% 
     parse_taxonomy(taxonomy)
+  expect_equal(df$scientificName[1], "Uncultured_marine_alveolate_Group_II_DH147-EKD16")
+  expect_equal(df$scientificName[2], "Notodasus")
+  expect_true(is.na(df$scientificName[3]))
+  expect_equal(df$domain[1], "Eukaryota")
+  expect_equal(df$domain[2], "Eukaryota")
+  expect_true(is.na(df$domain[3]))
 })
 
 test_that("remove_unparsable_names functions as expected", {
@@ -54,4 +61,15 @@ test_that("remove_unparsable_names functions as expected", {
   expect_equal(df$taxonRank[2], "genus")
   expect_true(is.na(df$scientificName[3]))
   expect_true(is.na(df$taxonRank[3]))
+})
+
+test_that("populate_species functions as expected", {
+  input <- data.frame(
+    scientificName = c("Abra alba", "Mola"),
+    genus = c("Abra", "Mola"),
+    taxonRank = c("species", "genus")
+  )
+  df <- populate_species(input)
+  expect_equal(df$species[1], "Abra alba")
+  expect_true(is.na(df$species[2]))
 })

@@ -3,6 +3,7 @@
 export(get_distinct_names)
 export(parse_taxonomy)
 export(parse_taxonomy_string)
+export(populate_species)
 export(remove_unparsable_names)
 export(replace_na_strings)
 export(update_scientificname_rank)

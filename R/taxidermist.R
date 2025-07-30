@@ -123,3 +123,13 @@ remove_unparsable_names <- function(df) {
     mutate(across(all_of(names(ranks_map)), ~ ifelse(. %in% unparsable_names, NA, .))) %>% 
     update_scientificname_rank()
 }
+
+#' Populate the species column using scientificName and taxonRank.
+#' 
+#' @param df A data frame.
+#' @return A data frame.
+#' @export
+populate_species <- function(df) {
+  df %>%
+    mutate(species = if_else(taxonRank == "species", scientificName, NA_character_))
+}
