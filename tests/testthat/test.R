@@ -63,6 +63,19 @@ test_that("remove_unparsable_names functions as expected", {
   expect_true(is.na(df$taxonRank[3]))
 })
 
+test_that("remove_unparsable_names handles incomplete taxonomies", {
+  input <- data.frame(
+    domain = c("Eukaryota", "Eukaryota"),
+    species = c("Uncultured_marine_alveolate_Group_II_DH147-EKD16", "Abra alba"),
+    scientificName = c("Uncultured_marine_alveolate_Group_II_DH147-EKD16", "Abra alba"),
+    taxonRank = c("species", "species")
+  )
+  df <- remove_unparsable_names(input)
+  expect_equal(df$scientificName[1], "Eukaryota")
+  expect_equal(df$scientificName[2], "Abra alba")
+  expect_true(is.na(df$species[1]))
+})
+
 test_that("populate_species functions as expected", {
   input <- data.frame(
     scientificName = c("Abra alba", "Mola"),

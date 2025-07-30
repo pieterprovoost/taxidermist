@@ -4,7 +4,7 @@
 #' @name taxidermist
 "_PACKAGE"
 
-#' @import dplyr stringr purrr
+#' @import dplyr tidyr stringr purrr
 NULL
 
 ranks_map <- c("superkingdom" = "sk", "domain" = "d", "phylum" = "p", "class" = "c", "order" = "o", "family" = "f", "genus" = "g", "species" = "s")
@@ -30,14 +30,15 @@ replace_na_strings <- function(df) {
 #' @return A data frame.
 #' @export
 update_scientificname_rank <- function(df) {
+  tax_columns <- intersect(names(ranks_map), names(df))
   df %>%
-    mutate(scientificName = do.call(coalesce, across(all_of(rev(names(ranks_map)))))) %>%
+    mutate(scientificName = do.call(coalesce, across(all_of(rev(tax_columns))))) %>%
     rowwise() %>%
     mutate(
       taxonRank = {
-        vals <- c_across(all_of(names(ranks_map)))
+        vals <- c_across(all_of(tax_columns))
         non_na <- which(!is.na(vals))
-        if (length(non_na)) names(ranks_map)[max(non_na)] else NA_character_
+        if (length(non_na)) tax_columns[max(non_na)] else NA_character_
       }
     ) %>%
     ungroup()
@@ -89,8 +90,9 @@ parse_taxonomy <- function(df, col) {
 #' @return A data frame.
 #' @export
 get_distinct_names <- function(df) {
+  tax_columns <- intersect(names(ranks_map), names(df))
   df %>%
-    select(all_of(names(ranks_map))) %>%
+    select(all_of(tax_columns)) %>%
     pivot_longer(everything(), values_to = "taxon") %>%
     filter(!is.na(taxon)) %>%
     distinct(taxon) %>%
@@ -113,6 +115,8 @@ gn_parse_names <- function(input) {
 #' @return A data frame.
 #' @export
 remove_unparsable_names <- function(df) {
+  tax_columns <- intersect(names(ranks_map), names(df))
+
   unparsable_names <- df %>% 
     get_distinct_names() %>% 
     gn_parse_names() %>% 
@@ -120,7 +124,7 @@ remove_unparsable_names <- function(df) {
     pull(input)
 
   df %>%
-    mutate(across(all_of(names(ranks_map)), ~ ifelse(. %in% unparsable_names, NA, .))) %>% 
+    mutate(across(all_of(tax_columns), ~ ifelse(. %in% unparsable_names, NA, .))) %>% 
     update_scientificname_rank()
 }
 
