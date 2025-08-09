@@ -50,14 +50,22 @@ update_scientificname_rank <- function(df) {
 #' @return A data frame with columns for each taxonomic rank and one row per input string.
 #' @export
 parse_taxonomy_string <- function(input) {
-  valid_pattern <- "^.*tax=([a-z]+:[^,]+)(,[a-z]+:[^,]+)*$"
+  valid_pattern <- "^.*;tax=([a-z]{1,2}:.*)(,[a-z]{1,2}:.*)+$"
   if (any(!grepl(valid_pattern, input))) {
     stop("Each input string must contain 'tax=' followed by a comma-separated list of key:value pairs (e.g., d:Eukaryota,p:NA,...)")
   }
 
+#str_split(">HQ616763;tax=d:Eukaryota,p:Mollusca,c:Gastropoda,o:Nudibranchia,f:Aeolidiidae,g:Spurilla,s:Spurilla_neapolitana_(Delle_Chiaje,_1841)", "(?=[sk|d|p|c|o|f|g|s]:)")
+# input <- ">HQ616763;tax=d:Eukaryota,p:Mollusca,c:Gastropoda,o:Nudibranchia,f:Aeolidiidae,g:Spurilla,s:Spurilla_neapolitana_(Delle_Chiaje,_1841)"
+# input %>%
+#   str_extract("(?<=tax=)[^\\s]+") %>% 
+#   str_split(",(?=[sk|d|p|c|o|f|g|s]:)") 
+
+
+
   input %>%
     str_extract("(?<=tax=)[^\\s]+") %>% 
-    str_split(",") %>% 
+    str_split(",(?=[sk|d|p|c|o|f|g|s]:)") %>% 
     map(str_split, ":") %>% 
     map(function(lst) {
       setNames(sapply(lst, `[`, 2), sapply(lst, `[`, 1))
