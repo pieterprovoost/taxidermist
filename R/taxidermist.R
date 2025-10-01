@@ -54,15 +54,6 @@ parse_taxonomy_string <- function(input) {
   if (any(!grepl(valid_pattern, input))) {
     stop("Each input string must contain 'tax=' followed by a comma-separated list of key:value pairs (e.g., d:Eukaryota,p:NA,...)")
   }
-
-#str_split(">HQ616763;tax=d:Eukaryota,p:Mollusca,c:Gastropoda,o:Nudibranchia,f:Aeolidiidae,g:Spurilla,s:Spurilla_neapolitana_(Delle_Chiaje,_1841)", "(?=[sk|d|p|c|o|f|g|s]:)")
-# input <- ">HQ616763;tax=d:Eukaryota,p:Mollusca,c:Gastropoda,o:Nudibranchia,f:Aeolidiidae,g:Spurilla,s:Spurilla_neapolitana_(Delle_Chiaje,_1841)"
-# input %>%
-#   str_extract("(?<=tax=)[^\\s]+") %>% 
-#   str_split(",(?=[sk|d|p|c|o|f|g|s]:)") 
-
-
-
   input %>%
     str_extract("(?<=tax=)[^\\s]+") %>% 
     str_split(",(?=[sk|d|p|c|o|f|g|s]:)") %>% 
@@ -112,7 +103,7 @@ get_distinct_names <- function(df) {
 #' @param input A vector of names.
 #' @return A data frame.
 gn_parse_names <- function(input) {
-  parsed <- gnparser::parse(input)
+  parsed <- gnparser::parse(input, cores = 2)
   parsed$input <- input
   parsed
 }
@@ -144,4 +135,31 @@ remove_unparsable_names <- function(df) {
 populate_species <- function(df) {
   df %>%
     mutate(species = if_else(taxonRank == "species", scientificName, NA_character_))
+}
+
+#' Match scientificName with WoRMS and populate scientificName and scientificNameID.
+#' Exact matches only, in case of multiple exact matches, the first one is used.
+#' 
+#' @param df A data frame.
+#' @return A data frame.
+#' @export
+match_exact_worms <- function(df) {
+  matched <- purrr::map(df$scientificName, function(name) {
+    res <- tryCatch({
+      worrms::wm_records_taxamatch(name, marine_only = FALSE) %>%
+        bind_rows() %>% 
+        filter(match_type == "exact")
+    }, error = function(e) {
+      data.frame()
+    })
+    if (nrow(res) > 0) {
+      return(res %>% head(1) %>% select(scientificname, lsid))
+    } else {
+      return(data.frame(scientificname = NA, lsid = NA))
+    }
+  }) %>% 
+    bind_rows()
+  df$scientificName <- matched$scientificname
+  df$scientificNameID <- matched$lsid
+  return(df)
 }
