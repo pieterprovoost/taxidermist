@@ -143,7 +143,7 @@ populate_species <- function(df) {
 #' @param df A data frame.
 #' @return A data frame.
 #' @export
-match_exact_worms <- function(df) {
+match_exact_worms <- function(df, accepted=TRUE) {
   matched <- purrr::map(df$scientificName, function(name) {
     res <- tryCatch({
       worrms::wm_records_taxamatch(name, marine_only = FALSE) %>%
@@ -153,7 +153,13 @@ match_exact_worms <- function(df) {
       data.frame()
     })
     if (nrow(res) > 0) {
-      return(res %>% head(1) %>% select(scientificname, lsid))
+      selected <- res %>% head(1)
+      if (accepted & selected$AphiaID != selected$valid_AphiaID) {
+        accepted <- worrms::wm_record(selected$valid_AphiaID)
+        return(accepted %>% select(scientificname, lsid))
+      } else {
+        return(selected %>% select(scientificname, lsid))
+      }
     } else {
       return(data.frame(scientificname = NA, lsid = NA))
     }

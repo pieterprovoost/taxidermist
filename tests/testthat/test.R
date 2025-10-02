@@ -91,8 +91,7 @@ test_that("populate_species functions as expected", {
 
 test_that("match_exact_worms functions as expected", {
   input <- data.frame(
-    scientificName = c("Abra alba", "Abra_alba", "Abrx")
-
+    scientificName = c("Abra alba", "Abra_alba", "Abrx", "Orca gladiator")
   )
   df <- match_exact_worms(input)
   expect_equal(df$scientificName[1], "Abra alba")
@@ -101,4 +100,5 @@ test_that("match_exact_worms functions as expected", {
   expect_equal(df$scientificNameID[2], "urn:lsid:marinespecies.org:taxname:141433")
   expect_true(is.na(df$scientificName[3]))
   expect_true(is.na(df$scientificNameID[3]))
+  expect_equal(df$scientificName[4], "Orcinus orca")
 })
