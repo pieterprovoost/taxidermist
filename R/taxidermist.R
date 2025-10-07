@@ -143,7 +143,7 @@ populate_species <- function(df) {
 #' @param df A data frame.
 #' @return A data frame.
 #' @export
-match_exact_worms <- function(df, accepted=TRUE) {
+match_exact_worms <- function(df, accepted=TRUE, replace_taxonomy=TRUE) {
   matched <- purrr::map(df$scientificName, function(name) {
     res <- tryCatch({
       worrms::wm_records_taxamatch(name, marine_only = FALSE) %>%
@@ -156,9 +156,9 @@ match_exact_worms <- function(df, accepted=TRUE) {
       selected <- res %>% head(1)
       if (accepted & selected$AphiaID != selected$valid_AphiaID) {
         accepted <- worrms::wm_record(selected$valid_AphiaID)
-        return(accepted %>% select(scientificname, lsid))
+        return(accepted)
       } else {
-        return(selected %>% select(scientificname, lsid))
+        return(selected)
       }
     } else {
       return(data.frame(scientificname = NA, lsid = NA))
@@ -167,5 +167,14 @@ match_exact_worms <- function(df, accepted=TRUE) {
     bind_rows()
   df$scientificName <- matched$scientificname
   df$scientificNameID <- matched$lsid
+  if (replace_taxonomy) {
+    df$phylum <- matched$phylum
+    df$class <- matched$phylum
+    df$order <- matched$phylum
+    df$family <- matched$phylum
+    df$genus <- matched$phylum
+    df$taxonRank <- tolower(matched$rank)
+    df <- df %>% populate_species()
+  }
   return(df)
 }
