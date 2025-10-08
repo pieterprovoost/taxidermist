@@ -143,11 +143,18 @@ populate_species <- function(df) {
 #' @param df A data frame.
 #' @return A data frame.
 #' @export
-match_exact_worms <- function(df, accepted=TRUE, replace_taxonomy=TRUE) {
+match_exact_worms <- function(df, accepted=TRUE, replace_taxonomy=TRUE, taxamatch=TRUE) {
+  if (taxamatch) {
+    fun <- worrms::wm_records_taxamatch
+    batch_size <- 50
+  } else {
+    fun <- worrms::wm_records_names
+    batch_size <- 50
+  }
   unique_names <- na.omit(unique(df$scientificName))
-  chunks <- split(unique_names, ceiling(seq_along(unique_names) / 50))
+  chunks <- split(unique_names, ceiling(seq_along(unique_names) / batch_size))
   valid_matches <- purrr::map(chunks, function(chunk) {
-    worms_results <- worrms::wm_records_taxamatch(chunk, marine_only = FALSE)
+    worms_results <- fun(chunk, marine_only = FALSE)
     names(worms_results) <- chunk
     valid_ids <- purrr::imap(worms_results, function(result_set, input) {
       if (nrow(result_set) == 0) {
@@ -168,7 +175,7 @@ match_exact_worms <- function(df, accepted=TRUE, replace_taxonomy=TRUE) {
       select(input, valid_AphiaID)
     valid_records <- worrms::wm_record(valid_ids$valid_AphiaID) %>% 
       mutate(input = valid_ids$input)
-  }) %>% 
+  }, .progress = TRUE) %>% 
     bind_rows()
   if (replace_taxonomy) {
     valid_matches <- valid_matches %>%

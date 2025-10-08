@@ -105,7 +105,7 @@ test_that("match_exact_worms functions as expected", {
 
 test_that("batched matching works as expected", {
   df <- read.csv(test_path("names.csv"))
-  res <- match_exact_worms(df)
+  res <- match_exact_worms(df, taxamatch = FALSE)
   expect_equal(res$scientificName[1], "Elysia pusilla")
   expect_equal(res$phylum[2], "Mollusca")
   expect_true(is.na(res$phylum[3]))
