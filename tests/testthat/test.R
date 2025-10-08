@@ -114,3 +114,10 @@ test_that("batched matching works as expected", {
   expect_equal(res$scientificName[5], "Elysia amakusana")
   expect_equal(res$scientificName[5], "Elysia amakusana")
 })
+
+test_that("batched matching works when worms return 204", {
+  df <- data.frame(scientificName = rep("xxx", 70))
+  res <- match_exact_worms(df, taxamatch = FALSE)
+  expect_true(is.na(res$scientificName[1]))
+  expect_true(is.na(res$scientificName[70]))
+})

@@ -154,11 +154,16 @@ match_exact_worms <- function(df, accepted=TRUE, replace_taxonomy=TRUE, taxamatc
   unique_names <- na.omit(unique(df$scientificName))
   chunks <- split(unique_names, ceiling(seq_along(unique_names) / batch_size))
   valid_matches <- purrr::map(chunks, function(chunk) {
-    worms_results <- fun(chunk, marine_only = FALSE)
+    worms_results <- tryCatch({
+      fun(chunk, marine_only = FALSE)
+    }, error = function(e) {
+      message("WoRMS request failed, skipping batch - ", e)
+      rep(list(data.frame()), length(chunk))
+    })
     names(worms_results) <- chunk
     valid_ids <- purrr::imap(worms_results, function(result_set, input) {
       if (nrow(result_set) == 0) {
-        data.frame(input = input)
+        data.frame(input = input, valid_AphiaID = NA)
       } else {
         result_set %>%
           filter(match_type == "exact") %>% 
@@ -171,10 +176,14 @@ match_exact_worms <- function(df, accepted=TRUE, replace_taxonomy=TRUE, taxamatc
       }
     }) %>% 
       bind_rows() %>% 
-      filter(!is.na(valid_AphiaID)) %>% 
-      select(input, valid_AphiaID)
-    valid_records <- worrms::wm_record(valid_ids$valid_AphiaID) %>% 
-      mutate(input = valid_ids$input)
+      select(input, valid_AphiaID) %>% 
+      filter(!is.na(valid_AphiaID)) 
+    if (nrow(valid_ids) > 0) {
+      worrms::wm_record(valid_ids$valid_AphiaID) %>% 
+        mutate(input = valid_ids$input)
+    } else {
+      data.frame(input = character(0), scientificname = character(0), lsid = character(0), phylum = character(0), class = character(0), order = character(0), family = character(0), genus = character(0), rank = character(0))
+    }
   }, .progress = TRUE) %>% 
     bind_rows()
   if (replace_taxonomy) {
