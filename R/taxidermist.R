@@ -144,37 +144,41 @@ populate_species <- function(df) {
 #' @return A data frame.
 #' @export
 match_exact_worms <- function(df, accepted=TRUE, replace_taxonomy=TRUE) {
-  matched <- purrr::map(df$scientificName, function(name) {
-    res <- tryCatch({
-      worrms::wm_records_taxamatch(name, marine_only = FALSE) %>%
-        bind_rows() %>% 
-        filter(match_type == "exact")
-    }, error = function(e) {
-      data.frame()
-    })
-    if (nrow(res) > 0) {
-      selected <- res %>% head(1)
-      if (accepted & selected$AphiaID != selected$valid_AphiaID) {
-        accepted <- worrms::wm_record(selected$valid_AphiaID)
-        return(accepted)
+  unique_names <- na.omit(unique(df$scientificName))
+  chunks <- split(unique_names, ceiling(seq_along(unique_names) / 50))
+  valid_matches <- purrr::map(chunks, function(chunk) {
+    worms_results <- worrms::wm_records_taxamatch(chunk, marine_only = FALSE)
+    names(worms_results) <- chunk
+    valid_ids <- purrr::imap(worms_results, function(result_set, input) {
+      if (nrow(result_set) == 0) {
+        data.frame(input = input)
       } else {
-        return(selected)
+        result_set %>%
+          filter(match_type == "exact") %>% 
+          mutate(sort_key = status != "accepted") %>% 
+          arrange(sort_key) %>% 
+          select(-sort_key) %>% 
+          slice(1) %>% 
+          mutate(input = input) %>% 
+          select(-unacceptreason)  # quick fix for non matching column types
       }
-    } else {
-      return(data.frame(scientificname = NA, lsid = NA))
-    }
+    }) %>% 
+      bind_rows() %>% 
+      filter(!is.na(valid_AphiaID)) %>% 
+      select(input, valid_AphiaID)
+    valid_records <- worrms::wm_record(valid_ids$valid_AphiaID) %>% 
+      mutate(input = valid_ids$input)
   }) %>% 
     bind_rows()
-  df$scientificName <- matched$scientificname
-  df$scientificNameID <- matched$lsid
   if (replace_taxonomy) {
-    df$phylum <- matched$phylum
-    df$class <- matched$phylum
-    df$order <- matched$phylum
-    df$family <- matched$phylum
-    df$genus <- matched$phylum
-    df$taxonRank <- tolower(matched$rank)
-    df <- df %>% populate_species()
+    valid_matches <- valid_matches %>%
+      select(input, scientificName = scientificname, scientificNameID = lsid, phylum, class, order, family, genus, taxonRank = rank) %>% 
+      mutate(taxonRank = tolower(taxonRank))
+  } else {
+    valid_matches <- valid_matches %>%
+      select(input, scientificName = scientificname, scientificNameID = lsid)
   }
-  return(df)
+  df %>% 
+    left_join(valid_matches, by = c("scientificName" = "input"), suffix = c("_old", "")) %>% 
+    select(-ends_with("_old"))
 }
