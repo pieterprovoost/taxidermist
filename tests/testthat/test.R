@@ -121,3 +121,11 @@ test_that("batched matching works when worms return 204", {
   expect_true(is.na(res$scientificName[1]))
   expect_true(is.na(res$scientificName[70]))
 })
+
+test_that("populate_worms functions as expected", {
+  df <- data.frame(AphiaID = c(141433, 99999999, 141434))
+  res <- populate_worms(df)
+  expect_equal(res$scientificName[1], "Abra alba")
+  expect_true(is.na(res$scientificName[2]))
+  expect_equal(res$scientificName[3], "Abra longicallus")
+})

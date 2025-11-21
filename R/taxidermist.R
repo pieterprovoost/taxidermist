@@ -52,7 +52,7 @@ update_scientificname_rank <- function(df) {
 parse_taxonomy_string <- function(input) {
   valid_pattern <- "^.*;tax=([a-z]{1,2}:.*)(,[a-z]{1,2}:.*)+$"
   if (any(!grepl(valid_pattern, input))) {
-    stop("Each input string must contain 'tax=' followed by a comma-separated list of key:value pairs (e.g., d:Eukaryota,p:NA,...)")
+    stop(glue("Each input string must contain 'tax=' followed by a comma-separated list of key:value pairs. Failed to parse {input}"))
   }
   input %>%
     str_extract("(?<=tax=)[^\\s]+") %>% 
@@ -163,7 +163,7 @@ match_exact_worms <- function(df, accepted=TRUE, replace_taxonomy=TRUE, taxamatc
     names(worms_results) <- chunk
     valid_ids <- purrr::imap(worms_results, function(result_set, input) {
       if (nrow(result_set) == 0) {
-        data.frame(input = input, valid_AphiaID = NA)
+        data.frame(input = input, valid_AphiaID = NA_integer_)
       } else {
         result_set %>%
           filter(match_type == "exact") %>% 
@@ -171,8 +171,8 @@ match_exact_worms <- function(df, accepted=TRUE, replace_taxonomy=TRUE, taxamatc
           arrange(sort_key) %>% 
           select(-sort_key) %>% 
           slice(1) %>% 
-          mutate(input = input) %>% 
-          select(-unacceptreason)  # quick fix for non matching column types
+          mutate(input = input) %>%
+          mutate(across(!c(AphiaID, valid_AphiaID), as.character))
       }
     }) %>% 
       bind_rows() %>% 
@@ -198,3 +198,107 @@ match_exact_worms <- function(df, accepted=TRUE, replace_taxonomy=TRUE, taxamatc
     left_join(valid_matches, by = c("scientificName" = "input"), suffix = c("_old", "")) %>% 
     select(-ends_with("_old"))
 }
+
+#' Populate taxonomy fields using a numeric AphiaID column.
+#' 
+#' @param df A data frame.
+#' @return A data frame.
+#' @export
+populate_worms <- function(df, col="AphiaID", replace_taxonomy=TRUE) {
+  batch_size <- 50
+  ids <- df[,col]
+  chunks <- split(ids, ceiling(seq_along(ids) / batch_size))
+  valid_matches <- purrr::map(chunks, function(chunk) {
+    worms_results <- tryCatch({
+      worrms::wm_record(chunk, marine_only = FALSE)
+    }, error = function(e) {
+      message("WoRMS request failed, skipping batch - ", e)
+      rep(list(data.frame()), length(chunk))
+    }) %>% split(seq(nrow(.)))
+    names(worms_results) <- chunk
+    valid_ids <- purrr::imap(worms_results, function(result_set, input) {
+      if (nrow(result_set) == 0) {
+        data.frame(input = input, valid_AphiaID = NA_integer_)
+      } else {
+        result_set %>%
+          filter(match_type == "exact") %>% 
+          mutate(sort_key = status != "accepted") %>% 
+          arrange(sort_key) %>% 
+          select(-sort_key) %>% 
+          slice(1) %>% 
+          mutate(input = input) %>%
+          mutate(across(!c(AphiaID, valid_AphiaID), as.character))
+      }
+    }) %>% 
+      bind_rows() %>% 
+      select(input, valid_AphiaID) %>% 
+      filter(!is.na(valid_AphiaID)) 
+    if (nrow(valid_ids) > 0) {
+      worrms::wm_record(valid_ids$valid_AphiaID) %>% 
+        mutate(input = valid_ids$input)
+    } else {
+      data.frame(input = character(0), scientificname = character(0), lsid = character(0), phylum = character(0), class = character(0), order = character(0), family = character(0), genus = character(0), rank = character(0))
+    }
+  }, .progress = TRUE) %>% 
+    bind_rows()
+  if (replace_taxonomy) {
+    valid_matches <- valid_matches %>%
+      select(input, scientificName = scientificname, scientificNameID = lsid, phylum, class, order, family, genus, taxonRank = rank) %>% 
+      mutate(taxonRank = tolower(taxonRank))
+  } else {
+    valid_matches <- valid_matches %>%
+      select(input, scientificName = scientificname, scientificNameID = lsid)
+  }
+  df %>% 
+    left_join(valid_matches %>% mutate(input = as.numeric(input)), by = c("AphiaID" = "input"), suffix = c("_old", "")) %>% 
+    select(-ends_with("_old"))
+}
+
+# replace_accepted <- function(df, replace_taxonomy=TRUE) {
+#   unique_names <- na.omit(unique(df$scientificName))
+#   chunks <- split(unique_names, ceiling(seq_along(unique_names) / batch_size))
+#   valid_matches <- purrr::map(chunks, function(chunk) {
+#     worms_results <- tryCatch({
+#       fun(chunk, marine_only = FALSE)
+#     }, error = function(e) {
+#       message("WoRMS request failed, skipping batch - ", e)
+#       rep(list(data.frame()), length(chunk))
+#     })
+#     names(worms_results) <- chunk
+#     valid_ids <- purrr::imap(worms_results, function(result_set, input) {
+#       if (nrow(result_set) == 0) {
+#         data.frame(input = input, valid_AphiaID = NA_integer_)
+#       } else {
+#         result_set %>%
+#           filter(match_type == "exact") %>% 
+#           mutate(sort_key = status != "accepted") %>% 
+#           arrange(sort_key) %>% 
+#           select(-sort_key) %>% 
+#           slice(1) %>% 
+#           mutate(input = input) %>%
+#           mutate(across(!c(AphiaID, valid_AphiaID), as.character))
+#       }
+#     }) %>% 
+#       bind_rows() %>% 
+#       select(input, valid_AphiaID) %>% 
+#       filter(!is.na(valid_AphiaID)) 
+#     if (nrow(valid_ids) > 0) {
+#       worrms::wm_record(valid_ids$valid_AphiaID) %>% 
+#         mutate(input = valid_ids$input)
+#     } else {
+#       data.frame(input = character(0), scientificname = character(0), lsid = character(0), phylum = character(0), class = character(0), order = character(0), family = character(0), genus = character(0), rank = character(0))
+#     }
+#   }, .progress = TRUE) %>% 
+#     bind_rows()
+#   if (replace_taxonomy) {
+#     valid_matches <- valid_matches %>%
+#       select(input, scientificName = scientificname, scientificNameID = lsid, phylum, class, order, family, genus, taxonRank = rank) %>% 
+#       mutate(taxonRank = tolower(taxonRank))
+#   } else {
+#     valid_matches <- valid_matches %>%
+#       select(input, scientificName = scientificname, scientificNameID = lsid)
+#   }
+#   df %>% 
+#     left_join(valid_matches, by = c("scientificName" = "input"), suffix = c("_old", "")) %>% 
+#     select(-ends_with("_old"))
+# }

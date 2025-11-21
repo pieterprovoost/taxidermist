@@ -5,7 +5,12 @@
 \title{Match scientificName with WoRMS and populate scientificName and scientificNameID.
 Exact matches only, in case of multiple exact matches, the first one is used.}
 \usage{
-match_exact_worms(df, accepted = TRUE, replace_taxonomy = TRUE)
+match_exact_worms(
+  df,
+  accepted = TRUE,
+  replace_taxonomy = TRUE,
+  taxamatch = TRUE
+)
 }
 \arguments{
 \item{df}{A data frame.}
