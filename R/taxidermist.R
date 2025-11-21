@@ -250,7 +250,7 @@ populate_worms <- function(df, col="AphiaID", replace_taxonomy=TRUE) {
       select(input, scientificName = scientificname, scientificNameID = lsid)
   }
   df %>% 
-    left_join(valid_matches %>% mutate(input = as.numeric(input)), by = c("AphiaID" = "input"), suffix = c("_old", "")) %>% 
+    left_join(valid_matches %>% mutate(input = as.numeric(input)), by = setNames("input", col), suffix = c("_old", "")) %>% 
     select(-ends_with("_old"))
 }
 

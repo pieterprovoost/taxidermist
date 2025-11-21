@@ -123,8 +123,8 @@ test_that("batched matching works when worms return 204", {
 })
 
 test_that("populate_worms functions as expected", {
-  df <- data.frame(AphiaID = c(141433, 99999999, 141434))
-  res <- populate_worms(df)
+  df <- data.frame(taxonid = c(141433, 99999999, 141434))
+  res <- populate_worms(df, "taxonid")
   expect_equal(res$scientificName[1], "Abra alba")
   expect_true(is.na(res$scientificName[2]))
   expect_equal(res$scientificName[3], "Abra longicallus")
